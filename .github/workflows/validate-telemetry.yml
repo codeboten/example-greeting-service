@@ -1,0 +1,64 @@
+name: Telemetry Live Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install weaver
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/open-telemetry/weaver/releases/download/v0.17.1/weaver-installer.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Verify weaver installation
+        run: weaver --version
+    
+      - uses: actions/setup-go@v6
+        with:
+            go-version: '1.24'
+      - run: go version
+
+      - name: Run live-check validation
+        run: |
+          make 
+          echo "Starting weaver live-check in background..."
+          weaver registry live-check -r model --inactivity-timeout 4 &
+          LIVE_CHECK_PID=$!
+          echo "Live-check started with PID: $LIVE_CHECK_PID"
+
+          # Give live-check a moment to initialize
+          sleep 2
+
+          echo "Running the application..."
+          make run
+
+          echo "Waiting for live-check process to finish..."
+          wait $LIVE_CHECK_PID
+          EXIT_CODE=$?
+
+          echo "Live-check process finished with exit code: $EXIT_CODE"
+
+          # Check if exit code is 0 (success)
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✅ Live-check validation passed!"
+          else
+            echo "❌ Live-check validation failed with exit code: $EXIT_CODE"
+            exit 1
+          fi

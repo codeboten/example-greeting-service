@@ -28,6 +28,7 @@ func calculateYear() int {
 }
 
 func yearHandler(w http.ResponseWriter, r *http.Request) {
+
 	ctx := r.Context()
 
 	year := func(ctx context.Context) int {
@@ -40,6 +41,13 @@ func yearHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, "%d", year)
 }
 
+func getHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/year", yearHandler)
+
+	return otelhttp.NewHandler(mux, "year")
+}
+
 func main() {
 	defer otelconf.Shutdown(context.Background())
 
@@ -49,11 +57,6 @@ func main() {
 
 	tracer = otel.Tracer("greeting-service/year-service")
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/year", yearHandler)
-
-	wrappedHandler := otelhttp.NewHandler(mux, "year")
-
 	log.Println("Listening on http://localhost:6001/year")
-	log.Fatal(http.ListenAndServe(":6001", wrappedHandler))
+	log.Fatal(http.ListenAndServe(":6001", getHandler()))
 }
