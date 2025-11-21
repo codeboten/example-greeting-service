@@ -6,15 +6,13 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/contrib/otelconf"
+	_ "go.opentelemetry.io/contrib/otelconf"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -30,6 +28,7 @@ func calculateYear() int {
 }
 
 func yearHandler(w http.ResponseWriter, r *http.Request) {
+
 	ctx := r.Context()
 
 	year := func(ctx context.Context) int {
@@ -42,31 +41,22 @@ func yearHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, "%d", year)
 }
 
-func main() {
-	ctx := context.Background()
-	exporter, _ := otlptrace.New(ctx, otlptracegrpc.NewClient(
-		otlptracegrpc.WithEndpoint(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")),
-		otlptracegrpc.WithHeaders(map[string]string{
-			"x-honeycomb-team": os.Getenv("HONEYCOMB_API_KEY"),
-		}),
-	))
-	tracerProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-	)
-	defer tracerProvider.Shutdown(ctx)
+func getHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/year", yearHandler)
 
-	otel.SetTracerProvider(tracerProvider)
+	return otelhttp.NewHandler(mux, "year")
+}
+
+func main() {
+	defer otelconf.Shutdown(context.Background())
+
 	otel.SetTextMapPropagator(
 		propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}),
 	)
 
 	tracer = otel.Tracer("greeting-service/year-service")
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/year", yearHandler)
-
-	wrappedHandler := otelhttp.NewHandler(mux, "year")
-
 	log.Println("Listening on http://localhost:6001/year")
-	log.Fatal(http.ListenAndServe(":6001", wrappedHandler))
+	log.Fatal(http.ListenAndServe(":6001", getHandler()))
 }
