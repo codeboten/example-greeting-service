@@ -39,7 +39,7 @@ jobs:
         run: |
           make 
           echo "Starting weaver live-check in background..."
-          weaver registry live-check --inactivity-timeout 4 &
+          weaver registry live-check --inactivity-timeout 10 &
           LIVE_CHECK_PID=$!
           echo "Live-check started with PID: $LIVE_CHECK_PID"
 
