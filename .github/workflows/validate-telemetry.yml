@@ -24,7 +24,7 @@ jobs:
 
       - name: Install weaver
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/open-telemetry/weaver/releases/download/v0.17.1/weaver-installer.sh | sh
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/open-telemetry/weaver/releases/download/v0.19.0/weaver-installer.sh | sh
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Verify weaver installation
@@ -39,7 +39,7 @@ jobs:
         run: |
           make 
           echo "Starting weaver live-check in background..."
-          weaver registry live-check -r model --inactivity-timeout 4 &
+          weaver registry live-check --inactivity-timeout 4 &
           LIVE_CHECK_PID=$!
           echo "Live-check started with PID: $LIVE_CHECK_PID"
 
